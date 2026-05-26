@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Check-in Scanner</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        #reader button {
+            background-color: #2563eb !important;
+            color: white !important;
+            padding: 0.5rem 1rem !important;
+            border-radius: 0.375rem !important;
+            font-weight: 600 !important;
+            margin: 5px !important;
+            cursor: pointer;
+            border: none !important;
+        }
+        #reader select {
+            padding: 0.5rem !important;
+            border-radius: 0.375rem !important;
+            border: 1px solid #d1d5db !important;
+            background-color: white !important;
+            margin: 5px !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-4">
+
+    <!-- LOGIN SCREEN -->
+    <div id="login-screen" class="w-full max-w-md my-auto bg-white rounded-xl shadow-md p-6 border border-gray-100 space-y-4">
+        <div class="text-center">
+            <h1 class="text-2xl font-bold text-gray-800">Desk Check-In Authorization</h1>
+            <p class="text-sm text-gray-500 mt-1">Please log in to access the event scanner</p>
+        </div>
+        <form id="login-form" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Access Password</label>
+                <input type="password" id="login-password" required placeholder="••••••••" class="mt-1 block w-full rounded-md border-gray-300 shadow-xs border p-2 focus:ring-blue-500 focus:border-blue-500">
+                <p id="login-error" class="text-xs text-red-600 mt-1 hidden">Incorrect password. Please try again.</p>
+            </div>
+            <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg shadow-sm hover:bg-blue-700 transition">Authorize Session</button>
+        </form>
+    </div>
+
+    <!-- MAIN APP CONTENT (Hidden by default) -->
+    <div id="app-content" class="w-full max-w-md space-y-4 hidden">
+        <header class="w-full text-center my-4">
+            <h1 class="text-2xl font-bold text-gray-800">Event Ticket Scanner</h1>
+            <p class="text-sm text-gray-500">Multi-user real-time check-in desk</p>
+        </header>
+
+        <main class="space-y-4">
+            <div class="bg-white rounded-xl shadow-md p-4 border border-gray-100">
+                <h2 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 text-center">Live Attendance Dashboard</h2>
+                <div class="grid grid-cols-3 gap-2 text-center">
+                    <div class="bg-blue-50/50 p-2 rounded-lg border border-blue-100">
+                        <p class="text-xs text-gray-500 font-medium">Adults</p>
+                        <p id="stat-adults" class="text-xl font-bold text-blue-700">...</p>
+                    </div>
+                    <div class="bg-purple-50/50 p-2 rounded-lg border border-purple-100">
+                        <p class="text-xs text-gray-500 font-medium">Kids U10</p>
+                        <p id="stat-kidsU10" class="text-xl font-bold text-purple-700">...</p>
+                    </div>
+                    <div class="bg-purple-50/50 p-2 rounded-lg border border-purple-100">
+                        <p class="text-xs text-gray-500 font-medium">Kids O10</p>
+                        <p id="stat-kidsO10" class="text-xl font-bold text-purple-700">...</p>
+                    </div>
+                    <div class="bg-green-50 p-2 rounded-lg border border-green-100 col-span-3">
+                        <p class="text-xs text-gray-500 font-medium">Total Checked In</p>
+                        <p id="stat-total" class="text-xl font-bold text-green-700">...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-md p-6 space-y-6">
+                <div id="scanner-section">
+                    <div id="reader" class="w-full bg-black rounded-lg overflow-hidden"></div>
+                    <p id="scanner-status" class="text-center text-sm text-gray-500 mt-2">Awaiting camera access...</p>
+                </div>
+
+                <div id="result-container" class="hidden space-y-4">
+                    <div id="status-banner" class="p-3 rounded-lg text-center font-semibold text-sm"></div>
+
+                    <div id="info-display" class="bg-gray-50 p-4 rounded-lg space-y-3 border border-gray-200">
+                        <div>
+                            <h3 class="font-bold text-gray-700 border-b pb-1 text-sm uppercase tracking-wide">User Registration Details</h3>
+                            <div class="mt-2 space-y-1 text-sm">
+                                <p class="text-gray-600"><strong>User UUID:</strong> <span id="display-uuid" class="text-gray-900 font-mono break-all"></span></p>
+                                <p class="text-gray-600"><strong>QR Code String:</strong> <span id="display-qrcode" class="text-gray-900 font-mono break-all"></span></p>
+                            </div>
+                        </div>
+
+                        <div class="pt-2 border-t border-gray-200">
+                            <h3 class="font-bold text-gray-700 pb-1 text-sm uppercase tracking-wide">Ticket Allotment</h3>
+                            <div class="grid grid-cols-3 gap-2 mt-1 text-xs">
+                                <p class="bg-blue-50 p-2 rounded text-center">Adults:<br><span id="expected-adults" class="font-bold text-blue-700 text-lg">0</span></p>
+                                <p class="bg-blue-50 p-2 rounded text-center">Kids U10:<br><span id="expected-kidsU10" class="font-bold text-blue-700 text-lg">0</span></p>
+                                <p class="bg-blue-50 p-2 rounded text-center">Kids O10:<br><span id="expected-kidsO10" class="font-bold text-blue-700 text-lg">0</span></p>
+                            </div>
+                        </div>
+                        
+                        <div id="previous-attendance-info" class="hidden p-2 bg-yellow-50 text-xs text-yellow-800 rounded border border-yellow-200">
+                            <strong>⚠️ Already Checked In:</strong> <span id="prev-adults">0</span> Adults, <span id="prev-kidsU10">0</span> KidsU10, <span id="prev-kidsO10">0</span> KidsO10, previously recorded.
+                        </div>
+                    </div>
+
+                    <form id="attendance-form" class="space-y-4">
+                        <input type="hidden" id="target-row">
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Actual Adults Arrived</label>
+                            <input type="number" id="actual-adults" min="0" required class="mt-1 block w-full rounded-md border-gray-300 shadow-xs border p-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Actual Kids U10 Arrived</label>
+                            <input type="number" id="actual-kidsU10" min="0" required class="mt-1 block w-full rounded-md border-gray-300 shadow-xs border p-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                      
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Actual Kids O10 Arrived</label>
+                            <input type="number" id="actual-kidsO10" min="0" required class="mt-1 block w-full rounded-md border-gray-300 shadow-xs border p-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div class="flex space-x-2 pt-2">
+                            <button type="submit" id="submit-btn" class="flex-1 bg-green-600 text-white font-bold py-2 rounded-lg shadow-sm hover:bg-green-700 transition">Confirm Check-In</button>
+                            <button type="button" id="cancel-btn" class="bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg hover:bg-gray-400 transition">Reset</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const API_URL = "https://script.google.com/macros/s/AKfycbwPhLJaDKoKgjcQQUVqtgBuGV_IehW05h5JwRsmxXepF97Hsq4SsFasy1BEo4liZq8Q4A/exec";
+        
+        // Change to your chosen check-in desk password
+        const APP_PASSWORD = "Event2026"; 
+
+        let html5QrcodeScanner;
+        let lastScannedQr = null;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            document.getElementById("login-form").addEventListener("submit", handleLogin);
+            document.getElementById("attendance-form").addEventListener("submit", handleAttendanceSubmit);
+            document.getElementById("cancel-btn").addEventListener("click", resetScannerView);
+        });
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const passwordInput = document.getElementById("login-password").value;
+            const errorText = document.getElementById("login-error");
+
+            if (passwordInput === APP_PASSWORD) {
+                // Hide login, reveal main application block
+                document.getElementById("login-screen").classList.add("hidden");
+                document.getElementById("app-content").classList.remove("hidden");
+                
+                // Initialize resources only after successful entry
+                initScanner();
+                fetchLiveStats(); 
+            } else {
+                errorText.classList.remove("hidden");
+                document.getElementById("login-password").value = "";
+            }
+        }
+
+        function fetchLiveStats() {
+            fetch(`${API_URL}?action=getStats`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.stats) {
+                        updateStatsUI(data.stats.totalAdults, data.stats.totalKidsU10, data.stats.totalKidsO10);
+                    }
+                })
+                .catch(err => console.warn("Could not fetch dashboard metrics:", err));
+        }
+
+        function updateStatsUI(adults, kidsU10, kidsO10) {
+            const totalAdults = parseInt(adults) || 0;
+            const totalKidsU10 = parseInt(kidsU10) || 0;
+            const totalKidsO10 = parseInt(kidsO10) || 0;
+            
+            document.getElementById("stat-adults").innerText = totalAdults;
+            document.getElementById("stat-kidsU10").innerText = totalKidsU10;
+            document.getElementById("stat-kidsO10").innerText = totalKidsO10;
+            document.getElementById("stat-total").innerText = totalAdults + totalKidsU10 + totalKidsO10;
+        }
+
+        function initScanner() {
+            html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
+                fps: 15, 
+                qrbox: function(viewfinderWidth, viewfinderHeight) {
+                    var minEdgePercentage = 0.7;
+                    var minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+                    var qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
+                    return { width: qrboxSize, height: qrboxSize };
+                },
+                rememberLastUsedCamera: true,
+                supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
+                videoConstraints: { facingMode: { exact: "environment" } }
+            });
+            html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+            
+            setTimeout(() => {
+                const videoElements = document.querySelectorAll('#reader video');
+                videoElements.forEach(video => {
+                    video.setAttribute('playsinline', 'true');
+                    video.setAttribute('webkit-playsinline', 'true');
+                    video.style.width = '100%';
+                    video.style.height = 'auto';
+                });
+            }, 1000);
+
+            document.getElementById("scanner-status").innerText = "Scanning active. Align QR code inside frame.";
+        }
+
+        function onScanSuccess(decodedText, decodedResult) {
+            if (decodedText === lastScannedQr) return; 
+            lastScannedQr = decodedText;
+            
+            if (navigator.vibrate) navigator.vibrate(100);
+            
+            html5QrcodeScanner.clear(); 
+            document.getElementById("scanner-status").innerText = "Validating Ticket details...";
+            
+            fetch(`${API_URL}?qrcode=${encodeURIComponent(decodedText)}`)
+                .then(res => res.json())
+                .then(data => {
+                    handleLookupResult(data);
+                    if (data.stats) {
+                        updateStatsUI(data.stats.totalAdults, data.stats.totalKidsU10, data.stats.totalKidsO10);
+                    }
+                })
+                .catch(err => {
+                    alert("Network Error Connecting to Google Sheets: " + err);
+                    resetScannerView();
+                });
+        }
+
+        function onScanFailure(error) {}
+
+        function handleLookupResult(data) {
+            const container = document.getElementById("result-container");
+            const banner = document.getElementById("status-banner");
+            const infoDisplay = document.getElementById("info-display");
+            const prevInfo = document.getElementById("previous-attendance-info");
+            const form = document.getElementById("attendance-form");
+            const submitBtn = document.getElementById("submit-btn");
+
+            container.classList.remove("hidden");
+            prevInfo.classList.add("hidden");
+            form.classList.remove("hidden");
+            submitBtn.disabled = false;
+            submitBtn.innerText = "Confirm Check-In";
+
+            if (!data.success) {
+                banner.className = "p-3 rounded-lg text-center font-semibold text-sm bg-red-100 text-red-800";
+                banner.innerText = data.message || "UNREGISTERED TICKET! Please direct to Registration Desk.";
+                infoDisplay.classList.add("hidden");
+                form.classList.add("hidden");
+                return;
+            }
+
+            infoDisplay.classList.remove("hidden");
+            
+            document.getElementById("target-row").value = data.row;
+            document.getElementById("display-uuid").innerText = data.uuid;
+            document.getElementById("display-qrcode").innerText = data.qrcode;
+            
+            document.getElementById("expected-adults").innerText = data.registered.adults;
+            document.getElementById("expected-kidsU10").innerText = data.registered.kidsU10;
+            document.getElementById("expected-kidsO10").innerText = data.registered.kidsO10;
+            
+            document.getElementById("actual-adults").value = data.registered.adults;
+            document.getElementById("actual-kidsU10").value = data.registered.kidsU10;
+            document.getElementById("actual-kidsO10").value = data.registered.kidsO10;
+
+            if (data.status === "ALREADY_REGISTERED") {
+                banner.className = "p-3 rounded-lg text-center font-semibold text-sm bg-yellow-100 text-yellow-800";
+                banner.innerText = "⚠️ ATTENTION: Ticket has already been used!";
+                
+                prevInfo.classList.remove("hidden");
+                document.getElementById("prev-adults").innerText = data.attended.adults;
+                document.getElementById("prev-kidsU10").innerText = data.attended.kidsU10;
+                document.getElementById("prev-kidsO10").innerText = data.attended.kidsO10;
+                
+                submitBtn.innerText = "Update Attendance Data";
+            } else {
+                banner.className = "p-3 rounded-lg text-center font-semibold text-sm bg-green-100 text-green-800";
+                banner.innerText = "✅ Ticket Verified Successfully";
+            }
+        }
+
+        function handleAttendanceSubmit(e) {
+            e.preventDefault();
+            const submitBtn = document.getElementById("submit-btn");
+            submitBtn.disabled = true;
+            submitBtn.innerText = "Saving to Sheet...";
+
+            const payload = {
+                row: document.getElementById("target-row").value,
+                actualAdults: document.getElementById("actual-adults").value,
+                actualKidsU10: document.getElementById("actual-kidsU10").value,
+                actualKidsO10: document.getElementById("actual-kidsO10").value
+            };
+
+            fetch(API_URL, {
+                method: "POST",
+                mode: "no-cors", 
+                cache: "no-cache",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            })
+            .then(() => {
+                alert("Success: Attendance stored into database successfully!");
+                resetScannerView();
+                setTimeout(fetchLiveStats, 1500); 
+            })
+            .catch(err => {
+                alert("Error saving attendance metrics: " + err);
+                submitBtn.disabled = false;
+                submitBtn.innerText = "Try Again";
+            });
+        }
+
+        function resetScannerView() {
+            lastScannedQr = null;
+            document.getElementById("result-container").classList.add("hidden");
+            document.getElementById("attendance-form").reset();
+            initScanner();
+        }
+    </script>
+</body>
+</html>

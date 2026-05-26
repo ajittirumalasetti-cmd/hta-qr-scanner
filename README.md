@@ -1,2 +1,2 @@
-# hta-qr-scanner
-HTA QR Scanner for Sri Sita-Rama Kalyanam Event
+# event-qr-scanner
+Sri Sita-Rama Kalyanam Event QR Scanner for 
